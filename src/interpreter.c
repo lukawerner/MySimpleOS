@@ -3,6 +3,10 @@
 #include <string.h>
 #include "shellmemory.h"
 #include "shell.h"
+#include <dirent.h>
+#include "helper.h"
+#include <sys/stat.h>
+#include <unistd.h>
 
 int MAX_ARGS_SIZE = 3;
 
@@ -23,11 +27,19 @@ int set(char *var, char *value);
 int print(char *var);
 int source(char *script);
 int echo(char *token);
+int my_ls();
+int my_mkdir(char *dirname);
+int my_touch(char *filename);
+int my_cd(char *dirname);
 int badcommandFileDoesNotExist();
 
 // Interpret commands and their arguments
 int interpreter(char *command_args[], int args_size) {
     int i;
+
+    /*for (i = 0; i < args_size; i++) {
+        printf("%s\n", command_args[i]);
+    }*/
 
     if (args_size < 1 || args_size > MAX_ARGS_SIZE) {
         return badcommand();
@@ -36,6 +48,8 @@ int interpreter(char *command_args[], int args_size) {
     for (i = 0; i < args_size; i++) {   // terminate args at newlines
         command_args[i][strcspn(command_args[i], "\r\n")] = 0;
     }
+
+
 
     if (strcmp(command_args[0], "help") == 0) {
         //help
@@ -70,6 +84,22 @@ int interpreter(char *command_args[], int args_size) {
             return badcommand();
         return echo(command_args[1]);
 
+    } else if (strcmp(command_args[0], "my_ls") == 0) {
+        if (args_size != 1)
+            return 1;
+        return my_ls();
+    } else if (strcmp(command_args[0], "my_mkdir") == 0) {
+        if (args_size != 2)
+            return 1;
+        return my_mkdir(command_args[1]);
+    } else if (strcmp(command_args[0], "my_touch") == 0) {
+        if (args_size != 2)
+            return 1;
+        return my_touch(command_args[1]);
+    } else if (strcmp(command_args[0], "my_cd") == 0) {
+        if (args_size != 2)
+            return 1;
+        return my_cd(command_args[1]);
     } else
         return badcommand();
 }
@@ -137,21 +167,96 @@ int source(char *script) {
 }
 
 int echo(char *token) {
-    char *output = token;
-    if (token[0] == '$' && token[1] != '\0') {
-       output =  mem_get_value(token + 1);
-    }
-    else {
-        output = token;
+    char *output = parseToken(token);
+
+
+    if (!is_alphanumeric(output)) {
+        printf("input or input value is not alphanumeric\r\n");
+        return 1;
     }
 
-    if (strcmp(output, "Variable does not exist") == 0) {
-        output = "";
-    }
     printf("%s\r\n", output);
     return 0;
 }
 
+int my_ls() {
+    DIR *dir_stream = opendir("."); // opens a directory stream associated with the current dir
+    struct dirent *entry; // dirent struct contains directory/file names and types
+
+    int names_size = 8;
+    int names_count = 0;
+    char **names = malloc(names_size * sizeof(char *));
+    
+
+    if (dir_stream == NULL) {
+        printf("couldn't access current directory");
+        return 1;
+    }
+
+    while ((entry = readdir(dir_stream)) != NULL) {
+        char *entry_name = strdup(entry->d_name);
+        if (names_count >= names_size) {
+            names_size *= 2;
+            char **temp = realloc(names, names_size * sizeof(char *)); // reallocating to temp prevents memory leak in case it fails
+            if (temp) names = temp;
+            else {
+                printf("couldn't reallocate space for the names array\n");
+                free_array(names, names_count);
+                free(entry_name);
+                closedir(dir_stream);
+                return 1;
+            }
+        }
+        names[names_count] = entry_name;
+        names_count ++;
+    }
+    bubble_sort_alphabetical(names, names_count);
+
+    for (int i = 0; i<names_count; i++) {
+        printf("%s\r\n", names[i]);
+        free(names[i]);
+    }
+
+    free(names);
+    closedir(dir_stream);
+}
+
+int my_mkdir(char *dirname) {
+
+    char *output = parseToken(dirname);
+    int status = 1;
+
+    if ((!is_alphanumeric(output)) || (status = mkdir(dirname, 0755)) != 0) { // 0755 corresponds to rwxr-xr-x permissions
+        printf("Bad command: my_mkdir\r\n"); // the ordering of the if statement above prevents
+    }                                    // creating the directory if the output isn't alphanumeric
+    return status;
+}
+
+int my_touch(char *filename) {
+    if (filename[0] == '\0' || !is_alphanumeric(filename)) {
+        printf("Invalid file name\r\n");
+        return 1;
+    }
+    FILE *new_file = fopen(filename, "w");
+    if (!new_file) {
+        printf("Couldn't create file\r\n");
+        return 1;
+    }
+    fclose(new_file);
+    return 0;
+}
+
+int my_cd(char *dirname) {
+    if (dirname[0] == '\0' || !is_alphanumeric(dirname)) {
+        printf("Invalid directory name\r\n");
+        return 1;
+    }
+    if (chdir(dirname) == -1) { // chdir does "cd $dirname", returns -1 if it fails
+        printf("Bad command: my_cd\r\n");
+        return 1;
+    }
+    return 0;
+}
     
        
 

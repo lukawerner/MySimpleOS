@@ -33,10 +33,32 @@ int main(int argc, char *argv[]) {
     
         if (fgets(userInput, MAX_USER_INPUT-1, stdin) == NULL) {    // fgets returns NULL when it reaches the end
             return 0;                                               // of the file (relevant for batch mode)
-        }            
+        }
+        //one-liners logic starts here
+        int end_idx = 0;
+        int start_idx = 0;
+        while (userInput[end_idx] != '\0') { // as long as we haven't reached the end of the input
+            if (userInput[end_idx] != ';' && userInput[end_idx] != '\n') { // if we haven't encountered a command separator
+                end_idx++; 
+                continue; // we just increment the user input index;
+            }
+            // else, we need to execute a command
+            size_t command_size = end_idx-start_idx;
+            char *curr_command = strndup(userInput + start_idx, command_size); // allocate and dup substring of userinput that corresponds to the separated command
+            errorCode = parseInput(curr_command);
+            free(curr_command);
+            if (errorCode == -1) exit(99);	// ignore all other errors 
+            
+            if (userInput[end_idx] == '\n') { // if we are done with the line (one-liners or a single command)
+                break; // we are done with the current input
+            }
 
-        errorCode = parseInput(userInput);
-        if (errorCode == -1) exit(99);	// ignore all other errors
+            else { // if we only encountered a ';' separator, we need to keep iterating
+                end_idx++;
+                start_idx = end_idx;
+            }
+        }
+        //one liner logic stops here;
         memset(userInput, 0, sizeof(userInput));
     }
 
@@ -54,8 +76,8 @@ int parseInput(char inp[]) {
     int ix = 0, w = 0;
     int wordlen;
     int errorCode;
-    for (ix = 0; inp[ix] == ' ' && ix < 1000; ix++); // skip white spaces
     while (inp[ix] != '\n' && inp[ix] != '\0' && ix < 1000) {
+        for (ix; inp[ix] == ' ' && ix < 1000; ix++); // skip white spaces
         // extract a word
         for (wordlen = 0; !wordEnding(inp[ix]) && ix < 1000; ix++, wordlen++) {
             tmp[wordlen] = inp[ix];                        
@@ -66,6 +88,9 @@ int parseInput(char inp[]) {
         if (inp[ix] == '\0') break;
         ix++; 
     }
+    /*for (int i = 0; i<w; i++) {
+        printf("%s\r\n", words[i]);
+    }*/
     errorCode = interpreter(words, w);
     return errorCode;
 }
