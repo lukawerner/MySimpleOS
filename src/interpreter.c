@@ -7,6 +7,7 @@
 #include "helper.h"
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 int MAX_ARGS_SIZE = 3;
 
@@ -31,6 +32,7 @@ int my_ls();
 int my_mkdir(char *dirname);
 int my_touch(char *filename);
 int my_cd(char *dirname);
+int run(char *args[]);
 int badcommandFileDoesNotExist();
 
 // Interpret commands and their arguments
@@ -100,7 +102,16 @@ int interpreter(char *command_args[], int args_size) {
         if (args_size != 2)
             return 1;
         return my_cd(command_args[1]);
-    } else
+    } else if (strcmp(command_args[0], "run") == 0) {
+        if (args_size < 2)
+            return 1;
+        for (int i = 0; i < args_size - 1; i++) { // we shift the argument array by 1, because we don't need
+            command_args[i] = command_args[i+1];  // to keep the first "run" entry, this allows us to set the last
+        }                                         // element to NULL, which is necessary for execvp() inside run()
+        command_args[args_size-1] = NULL;           // (execvp stops its argument list at NULL (sets the bound))
+        return run(command_args);
+    } 
+    else
         return badcommand();
 }
 
@@ -171,11 +182,11 @@ int echo(char *token) {
 
 
     if (!is_alphanumeric(output)) {
-        printf("input or input value is not alphanumeric\r\n");
+        printf("input or input value is not alphanumeric\n");
         return 1;
     }
 
-    printf("%s\r\n", output);
+    printf("%s\n", output);
     return 0;
 }
 
@@ -213,7 +224,7 @@ int my_ls() {
     bubble_sort_alphabetical(names, names_count);
 
     for (int i = 0; i<names_count; i++) {
-        printf("%s\r\n", names[i]);
+        printf("%s\n", names[i]);
         free(names[i]);
     }
 
@@ -224,22 +235,23 @@ int my_ls() {
 int my_mkdir(char *dirname) {
 
     char *output = parseToken(dirname);
+    //printf("%s\n", output);
     int status = 1;
 
-    if ((!is_alphanumeric(output)) || (status = mkdir(dirname, 0755)) != 0) { // 0755 corresponds to rwxr-xr-x permissions
-        printf("Bad command: my_mkdir\r\n"); // the ordering of the if statement above prevents
+    if ((!is_alphanumeric(output)) || (status = mkdir(output, 0755) != 0)) { // 0755 corresponds to rwxr-xr-x permissions
+        printf("Bad command: my_mkdir\n"); // the ordering of the if statement above prevents
     }                                    // creating the directory if the output isn't alphanumeric
     return status;
 }
 
 int my_touch(char *filename) {
     if (filename[0] == '\0' || !is_alphanumeric(filename)) {
-        printf("Invalid file name\r\n");
+        printf("Invalid file name\n");
         return 1;
     }
     FILE *new_file = fopen(filename, "w");
     if (!new_file) {
-        printf("Couldn't create file\r\n");
+        printf("Couldn't create file\n");
         return 1;
     }
     fclose(new_file);
@@ -248,16 +260,41 @@ int my_touch(char *filename) {
 
 int my_cd(char *dirname) {
     if (dirname[0] == '\0' || !is_alphanumeric(dirname)) {
-        printf("Invalid directory name\r\n");
+        printf("Invalid directory name\n");
         return 1;
     }
     if (chdir(dirname) == -1) { // chdir does "cd $dirname", returns -1 if it fails
-        printf("Bad command: my_cd\r\n");
+        printf("Bad command: my_cd\n");
         return 1;
     }
     return 0;
 }
+
+int run(char *args[]) {
+
+    pid_t pid = fork();
+
+    if (pid == -1) {
+        printf("Fork creation failed\n");
+        return 1;
+    }
     
+    else if (pid) { // if we are in the parent process we wait
+
+        if (waitpid(pid, NULL, 0) != pid) {             // waitpid waits specifically for the child process with id = pid, 2nd
+            printf("Child process hasn't exited\n");  // arg serves to report the status of the child process, we pass NULL
+            return 1;                                   // to not receive any status, 3rd argument is for options, we pass 0 to execute with none
+        }
+    } 
+    else { // we are in the children process
+        if (execvp(args[0], args) == -1) {                  //v -> vector, which allows to pass an array of argument as its 2nd argument, 
+            printf("Child process failed to execute\n");  //p -> PATH, asks the OS to check the PATH env variable, PATH is a list
+            exit(1);                                       //     containing all directories which have executable files --> allows to
+        }                                                   //     simply pass the command name as 1st argument, instead of a hardcoded path
+    }                                                       //execvp returns -1 only if it fails
+    return 0;                      
+}  
+                                   
        
 
 		

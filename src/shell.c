@@ -12,6 +12,7 @@ int parseInput(char ui[]);
 int main(int argc, char *argv[]) {
     printf("Shell version 1.5 created Dec 2025\n");
 
+
     char prompt = '$';  				// Shell prompt
     char userInput[MAX_USER_INPUT];		// user's input stored here
     int errorCode = 0;					// zero means no error, default
@@ -32,8 +33,10 @@ int main(int argc, char *argv[]) {
         if (interactiveMode) printf("%c ", prompt);
     
         if (fgets(userInput, MAX_USER_INPUT-1, stdin) == NULL) {    // fgets returns NULL when it reaches the end
-            return 0;                                               // of the file (relevant for batch mode)
+            printf("Bye!\n");                                       // of the file (relevant for batch mode)
+            return 0;                                               
         }
+
         //one-liners logic starts here
         int end_idx = 0;
         int start_idx = 0;
