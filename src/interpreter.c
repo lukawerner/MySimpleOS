@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include "scheduler.h"
 
 int MAX_ARGS_SIZE = 3;
 
@@ -153,27 +154,11 @@ int print(char *var) {
 }
 
 int source(char *script) {
-    int errCode = 0;
-    char line[MAX_USER_INPUT];
-    FILE *p = fopen(script, "rt");      // the program is in a file
-
-    if (p == NULL) {
-        return badcommandFileDoesNotExist();
+    int errCode = create_process(script, &ready_queue);
+    if (errCode) {
+        return badcommand();
     }
-
-    fgets(line, MAX_USER_INPUT - 1, p);
-    while (1) {
-        errCode = parseInput(line);     // which calls interpreter()
-        memset(line, 0, sizeof(line));
-
-        if (feof(p)) {
-            break;
-        }
-        fgets(line, MAX_USER_INPUT - 1, p);
-    }
-
-    fclose(p);
-
+    errCode = schedule_fcfs(&ready_queue);
     return errCode;
 }
 

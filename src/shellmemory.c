@@ -81,9 +81,9 @@ int prog_mem_alloc(int size) { // allocates a contiguous block of size size insi
             continue;                    // over the array until we find an empty slot
         }
         // empty slot found
-        start_idx = i;                   
-        for (int j = i + 1; j < size; j++) {
-            if (program_memory[j] != NULL) { // if the block can't be contiguous,
+        start_idx = i;             
+        for (int j = 0; j < size; j++) {
+            if (program_memory[i+j] != NULL) { // if the block can't be contiguous,
                 block_available = 0;        //  we set the flag to false
                 break;
             }
@@ -92,15 +92,12 @@ int prog_mem_alloc(int size) { // allocates a contiguous block of size size insi
         if (block_available) { // if the flag kept being true after the inner loop
             return start_idx;  // a contiguous block of size size was available
         }
-        else {
-            block_available = 1;
-        }
     }
     return start_idx;
 }
 
 void prog_write_line(int idx, const char *line) {
-    strdup(line, program_memory[idx]);
+    program_memory[idx] = strdup(line);
 }
 
 const char *prog_read_line(int idx) {

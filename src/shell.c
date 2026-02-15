@@ -5,8 +5,10 @@
 #include "shell.h"
 #include "interpreter.h"
 #include "shellmemory.h"
+#include "scheduler.h"
+#include "readyqueue.h"
 
-int parseInput(char ui[]);
+int parseInput(const char ui[]);
 
 // Start of everything
 int main(int argc, char *argv[]) {
@@ -29,6 +31,8 @@ int main(int argc, char *argv[]) {
 
     //init shell memory
     mem_init();
+    prog_mem_init();
+    ready_queue_init(&ready_queue);
                 
     while(1) { 
         if (interactiveMode) printf("%c ", prompt);
@@ -75,7 +79,7 @@ int wordEnding(char c) {
     return c == '\0' || c == '\n' || c == ' ';
 }
 
-int parseInput(char inp[]) {
+int parseInput(const char inp[]) {
     char tmp[200], *words[100];                            
     int ix = 0, w = 0;
     int wordlen;

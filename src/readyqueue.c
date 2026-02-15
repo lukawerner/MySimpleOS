@@ -1,25 +1,26 @@
 #include "readyqueue.h"
 #include "pcb.h"
 #include <stdlib.h>
+#include <stdio.h>
 
-typedef struct ReadyQueue {
-    PCB *head;
-    PCB *tail;
-} ReadyQueue;
+ReadyQueue ready_queue;
 
-ReadyQueue *ready_queue_create() {
-    ReadyQueue* queue = malloc(sizeof(ReadyQueue));
+void ready_queue_init(ReadyQueue *queue) {
+    if (queue == NULL) return;
     queue->head = NULL;
     queue->tail = NULL;
-    return queue;
 }
 
 int ready_queue_enqueue(PCB* pcb, ReadyQueue *queue) {
-    if (pcb_get_next(pcb) != NULL) {
+    if (pcb == NULL || queue == NULL) {
+        printf("Input arguments are NULL\n");
+        return 1;
+    }
+    else if (pcb_get_next(pcb) != NULL) {
         printf("PCB already in ready queue\n");
         return 1;
     }
-    else if (queue->head == queue->tail) {
+    else if (queue->tail == NULL || queue->head == NULL) { //empty list
         queue->head = pcb;
         queue->tail = pcb;
     }
@@ -30,8 +31,26 @@ int ready_queue_enqueue(PCB* pcb, ReadyQueue *queue) {
     }
     return 0;
 }
-
 PCB* ready_queue_dequeue(ReadyQueue *queue) {
+    if (queue == NULL) {
+        printf("Ready queue doesn't exist\n");
+        return NULL;
+    }
+    else if ((queue->tail == NULL) || (queue->head == NULL)) {
+        printf("Can't dequeue from empty list\n");
+        return NULL;
+    }
+    PCB *prev_head = queue->head;
+    PCB *new_head = pcb_get_next(prev_head);
+    if (new_head == NULL) { // only one element was in queue
+        queue->tail = NULL;
+    }
+    queue->head = new_head;
+    pcb_set_next(prev_head, NULL);
+    return prev_head;
+}
+
+PCB* ready_queue_pop(ReadyQueue *queue) {
     if (queue->tail == queue->head) {
         printf("Ready queue is empty\n");
         return NULL;
@@ -62,4 +81,8 @@ int ready_queue_destroy(ReadyQueue *queue) {
     }
     free(queue);
     return 0;
+}
+
+PCB *ready_queue_get_head(ReadyQueue *queue) {
+    return queue->head;
 }
