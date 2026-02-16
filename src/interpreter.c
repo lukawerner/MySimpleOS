@@ -10,7 +10,7 @@
 #include <sys/wait.h>
 #include "scheduler.h"
 
-int MAX_ARGS_SIZE = 3;
+int MAX_ARGS_SIZE = 5;
 
 int badcommand() {
     printf("Unknown Command\n");
@@ -28,6 +28,7 @@ int quit();
 int set(char *var, char *value);
 int print(char *var);
 int source(char *script);
+int exec(int argc, char *argv[]);
 int echo(char *token);
 int my_ls();
 int my_mkdir(char *dirname);
@@ -111,8 +112,13 @@ int interpreter(char *command_args[], int args_size) {
         }                                         // element to NULL, which is necessary for execvp() inside run()
         command_args[args_size-1] = NULL;           // (execvp stops its argument list at NULL (sets the bound))
         return run(command_args);
-    } 
-    else
+    }
+    else if (strcmp(command_args[0], "exec") == 0) {
+        if (args_size > 5 || args_size < 3) {
+            return 1; 
+        }
+        return exec(args_size - 1, command_args+1);
+    } else
         return badcommand();
 }
 
@@ -154,20 +160,43 @@ int print(char *var) {
 }
 
 int source(char *script) {
-    int errCode = create_process(script, &ready_queue);
+    const char *policy_string = "FCFS"; // source only executes one script, so any scheduling policy would act the same
+    Policy *fcfs_policy = parse_policy(policy_string);
+    int errCode = create_pcb_and_enqueue(script, &ready_queue, fcfs_policy);
     if (errCode) {
-        return badcommand();
+        free(fcfs_policy);
+        return badcommandFileDoesNotExist();
     }
-    errCode = schedule_fcfs(&ready_queue);
+    errCode = scheduler(&ready_queue, fcfs_policy);
+    free(fcfs_policy);
+    return errCode;
+}
+
+int exec(int argc, char *argv[]) {
+    const char* policy_string = argv[argc-1];
+    int errCode = 0;
+    Policy* active_policy = parse_policy(policy_string);
+    if (active_policy == NULL) {
+        return 1;
+    }
+    for (int i = 0; i<argc-1; i++) {
+        char *script = argv[i];
+        errCode = create_pcb_and_enqueue(script, &ready_queue, active_policy);
+        if (errCode) {
+            free(active_policy);
+            return badcommandFileDoesNotExist();
+        }
+    }
+    errCode = scheduler(&ready_queue, active_policy);
+    free(active_policy);
     return errCode;
 }
 
 int echo(char *token) {
     char *output = parseToken(token);
 
-
     if (!is_alphanumeric(output)) {
-        printf("input or input value is not alphanumeric\n");
+        printf("input or input value is not alphanumeric: %s\n", token);
         return 1;
     }
 

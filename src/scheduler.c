@@ -4,34 +4,51 @@
 #include "pcb.h"
 #include "readyqueue.h"
 #include "shell.h"
+#include <string.h>
+#include <stdlib.h>
 
-int create_process(char *script, ReadyQueue *queue) {
+Policy *parse_policy(const char *policy_string) {
+    Policy *new_policy = malloc(sizeof(Policy));
+    if (strcmp(policy_string, "FCFS") == 0) {
+        new_policy->job_length = -1;
+        new_policy->enqueue_function = ready_queue_enqueue_fcfs;
+    }
+    else {
+        free(new_policy);
+        printf("Invalid policy input\n");
+        return NULL;
+    }
+    return new_policy;
+}
+
+int create_pcb_and_enqueue(char *script, ReadyQueue *queue, Policy *policy) {
     PCB* new_pcb = load_program(script);
     if (new_pcb == NULL) {
         printf("Couldn't create a PCB for new process %s\n", script);
         return 1;
     }
-    ready_queue_enqueue(new_pcb, queue);
-    return 0;
+    return policy->enqueue_function(new_pcb, queue);
 }
 
-int schedule_fcfs(ReadyQueue *queue) {
-    PCB *process = ready_queue_dequeue(queue);
-    int start_idx = pcb_get_memory_idx(process);
-    int prog_size = pcb_get_program_size(process);
-    int pc;
-    int errorCode;
-    while ((pc = pcb_get_pc(process)) != (start_idx + prog_size)) {
-        const char *curr_command = prog_read_line(pc);
-        errorCode = parseInput(curr_command);
-        if (errorCode) {
-            printf("Process couldn't execute properly\n");
-            return errorCode;
+int scheduler(ReadyQueue *queue, Policy *policy) {
+    while ((queue->head != NULL) && (queue->tail != NULL)) {
+        PCB *process = ready_queue_dequeue(queue);
+        int start_idx = pcb_get_memory_idx(process);
+        int prog_size = pcb_get_program_size(process);
+        int pc;
+        int errorCode;
+        while ((pc = pcb_get_pc(process)) != (start_idx + prog_size)) {
+            const char *curr_command = prog_read_line(pc);
+            errorCode = parseInput(curr_command);
+            if (errorCode) {
+                printf("Process couldn't execute properly\n");
+                return errorCode;
+            }
+            pcb_increment_pc(process);
         }
-        pcb_increment_pc(process);
+        pcb_destroy(process);
     }
-    pcb_destroy(process);
-    return errorCode;
+    return 0;
 }
 
 PCB *load_program(char *script) {
