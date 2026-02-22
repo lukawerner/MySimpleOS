@@ -2,6 +2,7 @@
 #include "pcb.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "scheduler.h"
 
 ReadyQueue ready_queue;
 
@@ -11,7 +12,7 @@ void ready_queue_init(ReadyQueue *queue) {
     queue->tail = NULL;
 }
 
-int ready_queue_enqueue_fcfs(PCB* pcb, ReadyQueue *queue) {
+int ready_queue_enqueue(PCB* pcb, ReadyQueue *queue, Policy *policy) {
     if (pcb == NULL || queue == NULL) {
         printf("Input arguments are NULL\n");
         return 1;
@@ -23,13 +24,11 @@ int ready_queue_enqueue_fcfs(PCB* pcb, ReadyQueue *queue) {
     else if (queue->tail == NULL || queue->head == NULL) { //empty list
         queue->head = pcb;
         queue->tail = pcb;
+        return 0;
     }
     else {
-        PCB *prev_tail = queue->tail;
-        pcb_set_next(prev_tail, pcb);
-        queue->tail = pcb;
+        return policy->enqueue_function(pcb, queue, policy);
     }
-    return 0;
 }
 
 PCB* ready_queue_dequeue(ReadyQueue *queue) {
@@ -49,8 +48,4 @@ PCB* ready_queue_dequeue(ReadyQueue *queue) {
     queue->head = new_head;
     pcb_set_next(prev_head, NULL);
     return prev_head;
-}
-
-PCB *ready_queue_get_head(ReadyQueue *queue) {
-    return queue->head;
 }

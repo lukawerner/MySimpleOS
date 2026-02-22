@@ -167,13 +167,14 @@ int source(char *script) {
         free(fcfs_policy);
         return badcommandFileDoesNotExist();
     }
-    errCode = scheduler(&ready_queue, fcfs_policy);
+    errCode = run_scheduler(&ready_queue, fcfs_policy);
     free(fcfs_policy);
     return errCode;
 }
 
 int exec(int argc, char *argv[]) {
     const char* policy_string = argv[argc-1];
+    //printf("Policy is %s\n", policy_string);
     int errCode = 0;
     Policy* active_policy = parse_policy(policy_string);
     if (active_policy == NULL) {
@@ -187,7 +188,7 @@ int exec(int argc, char *argv[]) {
             return badcommandFileDoesNotExist();
         }
     }
-    errCode = scheduler(&ready_queue, active_policy);
+    errCode = run_scheduler(&ready_queue, active_policy);
     free(active_policy);
     return errCode;
 }

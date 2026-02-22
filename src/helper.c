@@ -10,7 +10,7 @@ int is_alphanumeric(char *string) {
     }
     int i = 0;
     while (string[i] != '\0') {
-        if (!isalnum(string[i])) {
+        if (!isalnum(string[i]) && string[i] != '_') {
             return 0;
         }
         i++;

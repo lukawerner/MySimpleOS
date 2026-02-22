@@ -11,5 +11,7 @@ PCB *pcb_get_next(PCB *pcb);
 int pcb_get_pc(PCB *pcb);
 int pcb_get_memory_idx(PCB *pcb);
 int pcb_get_program_size(PCB *pcb);
+void pcb_decrement_job_length_score(PCB *pcb);
+int pcb_get_job_length_score(PCB *pcb);
 
 #endif

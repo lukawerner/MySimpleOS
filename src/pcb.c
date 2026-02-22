@@ -2,6 +2,7 @@
 #include "shellmemory.h"
 #include <sys/types.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 static pid_t pid_tracker = 1;
 
@@ -10,6 +11,7 @@ typedef struct PCB {
     int memory_idx;
     int program_size;
     int pc;
+    int job_length_score;
     PCB* next;
 } PCB;
 
@@ -21,6 +23,7 @@ PCB* pcb_create(int memory_idx, int program_size) {
     pcb->memory_idx = memory_idx;
     pcb->program_size = program_size;
     pcb->pc = memory_idx;
+    pcb->job_length_score = program_size;
     pcb->next = NULL;
     return pcb;
 }
@@ -52,6 +55,16 @@ int pcb_get_memory_idx(PCB *pcb) {
 
 int pcb_get_program_size(PCB *pcb) {
     return pcb->program_size;
+}
+
+void pcb_decrement_job_length_score(PCB *pcb) {
+    if (pcb->job_length_score > 0) {
+        pcb->job_length_score--;
+    }
+}
+
+int pcb_get_job_length_score(PCB *pcb) {
+    return pcb->job_length_score;
 }
 
 
