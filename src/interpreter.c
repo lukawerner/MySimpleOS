@@ -9,8 +9,12 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include "scheduler.h"
+#include "policies.h"
+#include "background.h"
+#include "mt_scheduler.h"
 
-int MAX_ARGS_SIZE = 5;
+int MAX_ARGS_SIZE = 7;
+int multithreaded_mode = 0;
 
 int badcommand() {
     printf("Unknown Command\n");
@@ -114,7 +118,7 @@ int interpreter(char *command_args[], int args_size) {
         return run(command_args);
     }
     else if (strcmp(command_args[0], "exec") == 0) {
-        if (args_size > 5 || args_size < 3) {
+        if (args_size > MAX_ARGS_SIZE || args_size < 3) {
             return 1; 
         }
         return exec(args_size - 1, command_args+1);
@@ -137,7 +141,13 @@ source SCRIPT.TXT	Executes the file SCRIPT.TXT\n ";
 
 int quit() {
     printf("Bye!\n");
-    exit(0);
+    if (multithreaded_mode) {
+        handle_quit();
+        return 0;
+    }
+    else {
+        exit(0);
+    }
 }
 
 int set(char *var, char *value) {
@@ -162,33 +172,81 @@ int print(char *var) {
 int source(char *script) {
     const char *policy_string = "FCFS"; // source only executes one script, so any scheduling policy would act the same
     Policy *fcfs_policy = parse_policy(policy_string);
+    if (multithreaded_mode) {
+        pthread_mutex_lock(&ready_queue_lock);
+    }
     int errCode = create_pcb_and_enqueue(script, &ready_queue, fcfs_policy);
     if (errCode) {
         free(fcfs_policy);
         return badcommandFileDoesNotExist();
     }
     errCode = run_scheduler(&ready_queue, fcfs_policy);
+    if (multithreaded_mode) {
+        pthread_mutex_unlock(&ready_queue_lock);
+    }
     free(fcfs_policy);
     return errCode;
 }
 
 int exec(int argc, char *argv[]) {
-    const char* policy_string = argv[argc-1];
+    const char *multithread_flag = argv[argc-1];
+    int policy_idx = argc-1;
+    int bg_flag_idx = argc-1;
+    int background_mode = 0;
+
+    if (strcmp(multithread_flag, "MT") == 0) {
+        policy_idx--;
+        bg_flag_idx--;
+        multithreaded_mode = 1;
+    }
+
+    const char *background_flag = argv[bg_flag_idx];
+
+    if (strcmp(background_flag, "#") == 0) {
+        policy_idx--;
+        background_mode = 1;
+    }
+
+    const char* policy_string = argv[policy_idx];
     //printf("Policy is %s\n", policy_string);
     int errCode = 0;
     Policy* active_policy = parse_policy(policy_string);
     if (active_policy == NULL) {
         return 1;
     }
-    for (int i = 0; i<argc-1; i++) {
+    for (int i = 0; i<policy_idx; i++) {
         char *script = argv[i];
+        if (multithreaded_mode && threads_initialized) {
+            pthread_mutex_lock(&ready_queue_lock);
+        }
         errCode = create_pcb_and_enqueue(script, &ready_queue, active_policy);
+        if (multithreaded_mode && threads_initialized) {
+            pthread_mutex_unlock(&ready_queue_lock);
+        }
         if (errCode) {
             free(active_policy);
             return badcommandFileDoesNotExist();
         }
     }
-    errCode = run_scheduler(&ready_queue, active_policy);
+    if (background_mode) {
+        if (multithreaded_mode && threads_initialized) {
+            pthread_mutex_lock(&ready_queue_lock);
+        }
+        errCode = create_batch_script_pcb_and_enqueue();
+        if (multithreaded_mode && threads_initialized) {
+            pthread_mutex_unlock(&ready_queue_lock);
+        }
+        if (errCode) {
+            free(active_policy);
+            return badcommandFileDoesNotExist();
+        }
+    }
+    if (multithreaded_mode) {
+        errCode = run_multithreaded_scheduler(&ready_queue, active_policy);
+    }
+    else {
+        errCode = run_scheduler(&ready_queue, active_policy);
+    }
     free(active_policy);
     return errCode;
 }

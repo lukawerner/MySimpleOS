@@ -9,6 +9,7 @@ typedef struct ReadyQueue {
     PCB *tail;
 } ReadyQueue;
 //extern ReadyQueue ready_queue;
+
 void ready_queue_init(ReadyQueue *queue);
 int ready_queue_enqueue(PCB* pcb, ReadyQueue *queue, Policy *policy);
 PCB* ready_queue_dequeue(ReadyQueue *queue);

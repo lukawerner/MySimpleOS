@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "scheduler.h"
+#include "policies.h"
 
 ReadyQueue ready_queue;
 
@@ -24,6 +25,12 @@ int ready_queue_enqueue(PCB* pcb, ReadyQueue *queue, Policy *policy) {
     else if (queue->tail == NULL || queue->head == NULL) { //empty list
         queue->head = pcb;
         queue->tail = pcb;
+        return 0;
+    }
+    else if (pcb_get_background_mode(pcb)) { // append at head of queue when pcb is a batch script in background mode 
+        pcb_set_next(pcb, queue-> head);
+        queue->head = pcb;
+        pcb_toggle_background_mode(pcb); // the batch script is appended in front of the queue only once
         return 0;
     }
     else {

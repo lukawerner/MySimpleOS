@@ -13,6 +13,7 @@ typedef struct PCB {
     int pc;
     int job_length_score;
     PCB* next;
+    int backgroundModeOn; // set to 1 if we are in background mode and pcb is a batch script, else 0
 } PCB;
 
 
@@ -25,7 +26,16 @@ PCB* pcb_create(int memory_idx, int program_size) {
     pcb->pc = memory_idx;
     pcb->job_length_score = program_size;
     pcb->next = NULL;
+    pcb->backgroundModeOn = 0;
     return pcb;
+}
+
+void pcb_toggle_background_mode(PCB *pcb) {
+    pcb->backgroundModeOn = !(pcb->backgroundModeOn);
+}
+
+int pcb_get_background_mode(PCB *pcb) {
+    return pcb->backgroundModeOn;
 }
 
 void pcb_destroy(PCB *pcb) {

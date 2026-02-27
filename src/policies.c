@@ -1,5 +1,38 @@
 #include "policies.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+Policy *parse_policy(const char *policy_string) {
+    Policy *new_policy = malloc(sizeof(Policy));
+    if (strcmp(policy_string, "FCFS") == 0) {
+        new_policy->job_length = -1;
+        new_policy->enqueue_function = fcfs_enqueue;
+    }
+    else if (strcmp(policy_string, "SJF") == 0) {
+        new_policy->job_length = -1;
+        new_policy->enqueue_function = sjf_enqueue;
+        new_policy->get_metric_function = pcb_get_program_size;
+    }
+    else if (strcmp(policy_string, "RR") == 0) {
+        new_policy->job_length = 2;
+        new_policy->enqueue_function = fcfs_enqueue;
+    }
+    else if (strcmp(policy_string, "AGING") == 0) {
+        new_policy->job_length = 1;
+        new_policy->enqueue_function = sjf_enqueue;
+        new_policy->get_metric_function = pcb_get_job_length_score;
+    }
+    else if (strcmp(policy_string, "RR30") == 0) {
+        new_policy->job_length = 30;
+        new_policy->enqueue_function = fcfs_enqueue;
+    }
+    else {
+        free(new_policy);
+        return NULL;
+    }
+    return new_policy;
+}
 
 int fcfs_enqueue(PCB* pcb, ReadyQueue *queue, Policy *policy) {
     PCB *prev_tail = queue->tail;
@@ -34,7 +67,6 @@ int sjf_enqueue(PCB* pcb, ReadyQueue *queue, Policy *policy) {             // FO
             }
             
         }
-
         pcb_set_next(prev, pcb);
         pcb_set_next(pcb, next);
     }
