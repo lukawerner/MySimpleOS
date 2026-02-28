@@ -1,23 +1,22 @@
+#include "background.h"
+#include "helper.h"
+#include "mt_scheduler.h"
+#include "policies.h"
+#include "scheduler.h"
+#include "shell.h"
+#include "shellmemory.h"
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "shellmemory.h"
-#include "shell.h"
-#include <dirent.h>
-#include "helper.h"
 #include <sys/stat.h>
-#include <unistd.h>
 #include <sys/wait.h>
-#include "scheduler.h"
-#include "policies.h"
-#include "background.h"
-#include "mt_scheduler.h"
+#include <unistd.h>
 
 int MAX_ARGS_SIZE = 7;
 int multithreaded_mode = 0;
 extern pthread_t main_thread_id;
 extern int request_quit;
-
 
 int badcommand() {
     printf("Unknown Command\n");
@@ -48,89 +47,104 @@ int badcommandFileDoesNotExist();
 int interpreter(char *command_args[], int args_size) {
     int i;
 
-    /*for (i = 0; i < args_size; i++) {
-        printf("%s\n", command_args[i]);
-    }*/
-
     if (args_size < 1 || args_size > MAX_ARGS_SIZE) {
         return badcommand();
     }
 
-    for (i = 0; i < args_size; i++) {   // terminate args at newlines
+    // terminate args at newlines
+    for (i = 0; i < args_size; i++) {
         command_args[i][strcspn(command_args[i], "\r\n")] = 0;
     }
 
-
-
     if (strcmp(command_args[0], "help") == 0) {
         //help
-        if (args_size != 1)
+        if (args_size != 1) {
             return badcommand();
+        }
         return help();
-
-    } else if (strcmp(command_args[0], "quit") == 0) {
+    } 
+    else if (strcmp(command_args[0], "quit") == 0) {
         //quit
-        if (args_size != 1)
+        if (args_size != 1) {
             return badcommand();
+        }
         return quit();
-
-    } else if (strcmp(command_args[0], "set") == 0) {
+    } 
+    else if (strcmp(command_args[0], "set") == 0) {
         //set
-        if (args_size != 3)
+        if (args_size != 3) {
             return badcommand();
+        }
         return set(command_args[1], command_args[2]);
-
-    } else if (strcmp(command_args[0], "print") == 0) {
-        if (args_size != 2)
+    } 
+    else if (strcmp(command_args[0], "print") == 0) {
+        if (args_size != 2) {
             return badcommand();
+        }
         return print(command_args[1]);
-
-    } else if (strcmp(command_args[0], "source") == 0) {
-        if (args_size != 2)
+    } 
+    else if (strcmp(command_args[0], "source") == 0) {
+        if (args_size != 2) {
             return badcommand();
+        }
         return source(command_args[1]);
-
-    } else if (strcmp(command_args[0], "echo") == 0) {
-        if (args_size != 2)
+    } 
+    else if (strcmp(command_args[0], "echo") == 0) {
+        if (args_size != 2) {
             return badcommand();
+        }
         return echo(command_args[1]);
-
-    } else if (strcmp(command_args[0], "my_ls") == 0) {
-        if (args_size != 1)
+    } 
+    else if (strcmp(command_args[0], "my_ls") == 0) {
+        if (args_size != 1) {
             return 1;
+        }
         return my_ls();
-    } else if (strcmp(command_args[0], "my_mkdir") == 0) {
-        if (args_size != 2)
+    } 
+    else if (strcmp(command_args[0], "my_mkdir") == 0) {
+        if (args_size != 2) {
             return 1;
+        }
         return my_mkdir(command_args[1]);
-    } else if (strcmp(command_args[0], "my_touch") == 0) {
-        if (args_size != 2)
+    } 
+    else if (strcmp(command_args[0], "my_touch") == 0) {
+        if (args_size != 2) {
             return 1;
+        }
         return my_touch(command_args[1]);
-    } else if (strcmp(command_args[0], "my_cd") == 0) {
-        if (args_size != 2)
+    } 
+    else if (strcmp(command_args[0], "my_cd") == 0) {
+        if (args_size != 2) {
             return 1;
+        }
         return my_cd(command_args[1]);
-    } else if (strcmp(command_args[0], "run") == 0) {
-        if (args_size < 2)
+    } 
+    else if (strcmp(command_args[0], "run") == 0) {
+        if (args_size < 2) {
             return 1;
-        for (int i = 0; i < args_size - 1; i++) { // we shift the argument array by 1, because we don't need
-            command_args[i] = command_args[i+1];  // to keep the first "run" entry, this allows us to set the last
-        }                                         // element to NULL, which is necessary for execvp() inside run()
-        command_args[args_size-1] = NULL;           // (execvp stops its argument list at NULL (sets the bound))
+        }
+        // we shift the argument array by 1, because we don't need
+        // to keep the first "run" entry, this allows us to set the last
+        // element to NULL, which is necessary for execvp() inside run()
+        for (int i = 0; i < args_size - 1; i++) {
+            command_args[i] = command_args[i + 1];
+        }
+        // execvp stops its argument list at NULL (sets the bound)
+        command_args[args_size - 1] = NULL;
         return run(command_args);
-    }
+    } 
     else if (strcmp(command_args[0], "exec") == 0) {
         if (args_size > MAX_ARGS_SIZE || args_size < 3) {
-            return 1; 
+            return 1;
         }
-        return exec(args_size - 1, command_args+1);
-    } else
+        return exec(args_size - 1, command_args + 1);
+    } 
+    else {
         return badcommand();
+    }
 }
 
 int help() {
-
     // note the literal tab characters here for alignment
     char help_string[] = "COMMAND			DESCRIPTION\n \
 help			Displays all the commands\n \
@@ -144,14 +158,16 @@ source SCRIPT.TXT	Executes the file SCRIPT.TXT\n ";
 
 int quit() {
     printf("Bye!\n");
+
     if (multithreaded_mode) {
-        if (pthread_equal(pthread_self(), main_thread_id)) { // only the main thread can handle quit and joining the threads
+        // only the main thread can handle quit and joining the threads
+        if (pthread_equal(pthread_self(), main_thread_id)) {
             handle_quit();
             exit(0);
-        }
-        else {  // if a worker called quit, we raise request_quit flag to let main know to finish when stdin is empty
+        } else {
+            // if a worker called quit, we raise request_quit flag to let main know to finish
+            // when stdin is empty
             pthread_mutex_lock(&ready_queue_lock);
-            thread_shutdown = 1; // we also signal the other thread that it can exit in case it's sleeping
             request_quit = 1;
             pthread_cond_broadcast(&queue_not_empty);
             pthread_mutex_unlock(&ready_queue_lock);
@@ -170,11 +186,9 @@ int set(char *var, char *value) {
     // through them, concatenate each token to the buffer, and handle spacing
     // appropriately. Investigate how `strcat` works and how you can use it
     // effectively here.
-
     mem_set_value(var, value);
     return 0;
 }
-
 
 int print(char *var) {
     printf("%s\n", mem_get_value(var));
@@ -182,22 +196,24 @@ int print(char *var) {
 }
 
 int source(char *script) {
-    const char *policy_string = "FCFS"; // source only executes one script, so any scheduling policy would act the same
+    const char *policy_string = "FCFS";  // source only executes one script, so any scheduling policy would act the same
     Policy *fcfs_policy = parse_policy(policy_string);
     int errCode = create_pcb_and_enqueue(script, &ready_queue, fcfs_policy);
+
     if (errCode) {
         free(fcfs_policy);
         return badcommandFileDoesNotExist();
     }
+
     errCode = run_scheduler(&ready_queue, fcfs_policy);
     free(fcfs_policy);
     return errCode;
 }
 
 int exec(int argc, char *argv[]) {
-    const char *multithread_flag = argv[argc-1];
-    int policy_idx = argc-1;
-    int bg_flag_idx = argc-1;
+    const char *multithread_flag = argv[argc - 1];
+    int policy_idx = argc - 1;
+    int bg_flag_idx = argc - 1;
     int background_mode = 0;
 
     if (strcmp(multithread_flag, "MT") == 0) {
@@ -213,47 +229,57 @@ int exec(int argc, char *argv[]) {
         background_mode = 1;
     }
 
-    const char* policy_string = argv[policy_idx];
+    const char *policy_string = argv[policy_idx];
     //printf("Policy is %s\n", policy_string);
     int errCode = 0;
-    Policy* active_policy = parse_policy(policy_string);
+    Policy *active_policy = parse_policy(policy_string);
+
     if (active_policy == NULL) {
         return 1;
     }
-    for (int i = 0; i<policy_idx; i++) {
+
+    for (int i = 0; i < policy_idx; i++) {
         char *script = argv[i];
+
         if (multithreaded_mode) {
             pthread_mutex_lock(&ready_queue_lock);
         }
+
         errCode = create_pcb_and_enqueue(script, &ready_queue, active_policy);
+
         if (multithreaded_mode) {
             pthread_mutex_unlock(&ready_queue_lock);
         }
+
         if (errCode) {
             free(active_policy);
             return badcommandFileDoesNotExist();
         }
     }
+
     if (background_mode) {
         if (multithreaded_mode) {
             pthread_mutex_lock(&ready_queue_lock);
         }
+
         errCode = create_batch_script_pcb_and_enqueue();
 
         if (multithreaded_mode) {
             pthread_mutex_unlock(&ready_queue_lock);
         }
+
         if (errCode) {
             free(active_policy);
             return badcommandFileDoesNotExist();
         }
     }
+
     if (multithreaded_mode) {
         errCode = run_multithreaded_scheduler(&ready_queue, active_policy);
-    }
-    else {
+    } else {
         errCode = run_scheduler(&ready_queue, active_policy);
     }
+
     free(active_policy);
     return errCode;
 }
@@ -271,13 +297,11 @@ int echo(char *token) {
 }
 
 int my_ls() {
-    DIR *dir_stream = opendir("."); // opens a directory stream associated with the current dir
-    struct dirent *entry; // dirent struct contains directory/file names and types
-
+    DIR *dir_stream = opendir(".");  // opens a directory stream associated with the current dir
+    struct dirent *entry;            // dirent struct contains directory/file names and types
     int names_size = 8;
     int names_count = 0;
     char **names = malloc(names_size * sizeof(char *));
-    
 
     if (dir_stream == NULL) {
         printf("couldn't access current directory");
@@ -286,10 +310,15 @@ int my_ls() {
 
     while ((entry = readdir(dir_stream)) != NULL) {
         char *entry_name = strdup(entry->d_name);
+
         if (names_count >= names_size) {
             names_size *= 2;
-            char **temp = realloc(names, names_size * sizeof(char *)); // reallocating to temp prevents memory leak in case it fails
-            if (temp) names = temp;
+            char **temp = realloc(names, names_size * sizeof(char *));
+
+            // reallocating to temp prevents memory leak in case it fails
+            if (temp != NULL) {
+                names = temp;
+            } 
             else {
                 printf("couldn't reallocate space for the names array\n");
                 free_array(names, names_count);
@@ -299,11 +328,11 @@ int my_ls() {
             }
         }
         names[names_count] = entry_name;
-        names_count ++;
+        names_count++;
     }
     bubble_sort_alphabetical(names, names_count);
 
-    for (int i = 0; i<names_count; i++) {
+    for (int i = 0; i < names_count; i++) {
         printf("%s\n", names[i]);
         free(names[i]);
     }
@@ -313,14 +342,16 @@ int my_ls() {
 }
 
 int my_mkdir(char *dirname) {
-
     char *output = parseToken(dirname);
-    //printf("%s\n", output);
     int status = 1;
 
-    if ((!is_alphanumeric(output)) || (status = mkdir(output, 0755) != 0)) { // 0755 corresponds to rwxr-xr-x permissions
-        printf("Bad command: my_mkdir\n"); // the ordering of the if statement above prevents
-    }                                    // creating the directory if the output isn't alphanumeric
+    // 0755 corresponds to rwxr-xr-x permissions
+    // the ordering of the if statement above prevents creating the directory
+    // if the output isn't alphanumeric
+    if ((!is_alphanumeric(output)) || (status = mkdir(output, 0755) != 0)) {
+        printf("Bad command: my_mkdir\n");
+    }
+
     return status;
 }
 
@@ -343,38 +374,44 @@ int my_cd(char *dirname) {
         printf("Invalid directory name\n");
         return 1;
     }
-    if (chdir(dirname) == -1) { // chdir does "cd $dirname", returns -1 if it fails
+
+    // chdir does "cd $dirname", returns -1 if it fails
+    if (chdir(dirname) == -1) {
         printf("Bad command: my_cd\n");
         return 1;
     }
+
     return 0;
 }
 
 int run(char *args[]) {
-
     pid_t pid = fork();
 
     if (pid == -1) {
         printf("Fork creation failed\n");
         return 1;
-    }
-    
-    else if (pid) { // if we are in the parent process we wait
-
-        if (waitpid(pid, NULL, 0) != pid) {             // waitpid waits specifically for the child process with id = pid, 2nd
-            printf("Child process hasn't exited\n");  // arg serves to report the status of the child process, we pass NULL
-            return 1;                                   // to not receive any status, 3rd argument is for options, we pass 0 to execute with none
+    } 
+    else if (pid > 0) {
+        // if we are in the parent process we wait
+        // waitpid waits specifically for the child process with id = pid
+        if (waitpid(pid, NULL, 0) != pid) {
+            // arg serves to report the status of the child process, we pass NULL
+            // to not receive any status, 3rd argument is for options, we pass 0 to execute with none
+            printf("Child process hasn't exited\n");
+            return 1;
         }
     } 
-    else { // we are in the children process
-        if (execvp(args[0], args) == -1) {                  //v -> vector, which allows to pass an array of argument as its 2nd argument, 
-            printf("Child process failed to execute\n");  //p -> PATH, asks the OS to check the PATH env variable, PATH is a list
-            exit(1);                                       //     containing all directories which have executable files --> allows to
-        }                                                   //     simply pass the command name as 1st argument, instead of a hardcoded path
-    }                                                       //execvp returns -1 only if it fails
-    return 0;                      
-}  
-                                   
-       
-
-		
+    else {
+        // we are in the children process
+        // v -> vector, which allows to pass an array of argument as its 2nd argument
+        // p -> PATH, asks the OS to check the PATH env variable, PATH is a list
+        // containing all directories which have executable files --> allows to
+        // simply pass the command name as 1st argument, instead of a hardcoded path
+        // execvp returns -1 only if it fails
+        if (execvp(args[0], args) == -1) {
+            printf("Child process failed to execute\n");
+            exit(1);
+        }
+    }
+    return 0;
+}

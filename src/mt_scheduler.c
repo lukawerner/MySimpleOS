@@ -1,11 +1,10 @@
 #include "mt_scheduler.h"
-#include <pthread.h>
-#include "readyqueue.h"
 #include "policies.h"
-#include <stdlib.h>
-#include <stdio.h>
+#include "readyqueue.h"
 #include "scheduler.h"
-
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 pthread_cond_t queue_not_empty = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t ready_queue_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -17,13 +16,13 @@ int thread_shutdown = 0;
 static WorkerArgs *worker_args = NULL;
 static Policy shared_policy;
 int request_quit = 0;
+static int workers_active = 0;
 
 pthread_t worker[THREAD_NUMBER];
 
-
-int run_multithreaded_scheduler(ReadyQueue *queue, Policy *policy) {    // supports fcfs, and RR
+int run_multithreaded_scheduler(ReadyQueue *queue, Policy *policy) {  // supports fcfs, and RR
     if (!threads_initialized) {
-        int errCode = 0;    
+        int errCode = 0;
 
         worker_args = malloc(sizeof(WorkerArgs));
         if (worker_args == NULL) {
@@ -37,12 +36,7 @@ int run_multithreaded_scheduler(ReadyQueue *queue, Policy *policy) {    // suppo
         thread_shutdown = 0;
         request_quit = 0;
 
-        /*pthread_mutex_init(&ready_queue_lock, NULL);
-        pthread_cond_init(&queue_not_empty, NULL);
-        pthread_mutex_init(&interpreter_lock, NULL);
-        pthread_mutex_init(&shellmemory_lock, NULL);*/
-
-        for (int i=0; i<THREAD_NUMBER; i++) {
+        for (int i = 0; i < THREAD_NUMBER; i++) {
             errCode = pthread_create(&worker[i], NULL, worker_scheduler, worker_args);
             if (errCode) {
                 printf("Couldn't create thread %d\n", i);
@@ -54,32 +48,34 @@ int run_multithreaded_scheduler(ReadyQueue *queue, Policy *policy) {    // suppo
         pthread_cond_broadcast(&queue_not_empty);
         pthread_mutex_unlock(&ready_queue_lock);
         return 0;
-    }
+    } 
     else {
         pthread_mutex_lock(&ready_queue_lock);
-        pthread_cond_broadcast(&queue_not_empty); // if already initialized threads, only option is that exec has been nested called
-        pthread_mutex_unlock(&ready_queue_lock);
-    }                                             // ReadyQueue now has new PCBs
-    return 0;                                             
+        pthread_cond_broadcast(&queue_not_empty);  // if already initialized threads, only option is
+                                                   // that exec has been nested called
+        pthread_mutex_unlock(&ready_queue_lock);   // ReadyQueue has new PCBs, broadcast to threads so
+                                                   // they start working
+    }
+    return 0;
 }
 
-void *worker_scheduler(void* arg) {
-    WorkerArgs *arguments = (WorkerArgs *) arg;
+void *worker_scheduler(void *arg) {
+    WorkerArgs *arguments = (WorkerArgs *)arg;
     ReadyQueue *queue = arguments->queue;
     Policy *policy = arguments->policy;
     int errorCode = 0;
 
     while (1) {
         pthread_mutex_lock(&ready_queue_lock);
-        while (queue->head == NULL && !thread_shutdown) { // queue empty and threads haven't seen a quit command yet
-            pthread_cond_wait(&queue_not_empty, &ready_queue_lock); // we wait
+        while (queue->head == NULL && !thread_shutdown) {            // queue empty and threads haven't seen a quit command yet
+            pthread_cond_wait(&queue_not_empty, &ready_queue_lock);  // we wait
         }
-        if (thread_shutdown && queue->head == NULL) { // if queue empty and quit command seen, worker's job is done
+        if (thread_shutdown && queue->head == NULL) {  // if queue empty and quit command seen, worker's job is done
             pthread_mutex_unlock(&ready_queue_lock);
             return NULL;
         }
         PCB *process = ready_queue_dequeue(queue);
-
+        workers_active++;
         pthread_mutex_unlock(&ready_queue_lock);
 
         errorCode = exec_program(process, queue, policy);
@@ -87,37 +83,43 @@ void *worker_scheduler(void* arg) {
         if (errorCode) {
             return NULL;
         }
-
+        pthread_mutex_lock(&ready_queue_lock);
         if (process_completed(process)) {
-            pthread_mutex_lock(&ready_queue_lock);
             pcb_destroy(process);
-            pthread_mutex_unlock(&ready_queue_lock);
-        }
+        } 
         else {
-            pthread_mutex_lock(&ready_queue_lock);
             errorCode = ready_queue_enqueue(process, queue, policy);
+
             pthread_cond_signal(&queue_not_empty);
-            pthread_mutex_unlock(&ready_queue_lock);
 
             if (errorCode) {
                 printf("Couldn't enqueue uncompleted process\n");
                 return NULL;
             }
         }
+        workers_active--;
+        if (queue->head == NULL && workers_active == 0) pthread_cond_broadcast(&queue_not_empty);  // we wake up sleeping main thread in handle_quit()
+        pthread_mutex_unlock(&ready_queue_lock);
     }
 }
 
-void handle_quit() {    // can only be called by the main thread
+void handle_quit() {  // can only be called by the main thread
     pthread_mutex_lock(&ready_queue_lock);
     if (!threads_initialized) {
         pthread_mutex_unlock(&ready_queue_lock);
         return;
     }
-    thread_shutdown = 1;                      // the thread which sees the quit command sets the shutdown flag
-    pthread_cond_broadcast(&queue_not_empty); // and broadcasts to the others to wake up if waiting, allowing them to exit
+
+    while (ready_queue.head != NULL || workers_active > 0) {  // we stall until all workers finish and all PCBs are executed
+        pthread_cond_wait(&queue_not_empty, &ready_queue_lock);
+    }
+
+    thread_shutdown = 1;                       // the thread which sees the quit command sets the shutdown flag
+    pthread_cond_broadcast(&queue_not_empty);  // and broadcasts to the others to wake up if waiting,
+                                               // allowing them to exit
     pthread_mutex_unlock(&ready_queue_lock);
 
-    for (int i=0; i<THREAD_NUMBER; i++) { // 
+    for (int i = 0; i < THREAD_NUMBER; i++) {  //
         pthread_join(worker[i], NULL);
     }
     pthread_mutex_lock(&ready_queue_lock);

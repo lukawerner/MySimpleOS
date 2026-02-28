@@ -6,7 +6,7 @@
 typedef struct ReadyQueue ReadyQueue;
 typedef struct Policy Policy;
 
-typedef struct WorkerArgs{
+typedef struct WorkerArgs {
     Policy *policy;
     ReadyQueue *queue;
 } WorkerArgs;
@@ -17,9 +17,7 @@ extern int thread_shutdown;
 extern int threads_initialized;
 
 int run_multithreaded_scheduler(ReadyQueue *queue, Policy *policy);
-void *worker_scheduler(void* arg);
+void *worker_scheduler(void *arg);
 void handle_quit();
-
-
 
 #endif

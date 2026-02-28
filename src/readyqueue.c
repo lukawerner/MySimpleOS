@@ -1,9 +1,9 @@
 #include "readyqueue.h"
 #include "pcb.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include "scheduler.h"
 #include "policies.h"
+#include "scheduler.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 ReadyQueue ready_queue;
 
@@ -13,43 +13,43 @@ void ready_queue_init(ReadyQueue *queue) {
     queue->tail = NULL;
 }
 
-int ready_queue_enqueue(PCB* pcb, ReadyQueue *queue, Policy *policy) {
+int ready_queue_enqueue(PCB *pcb, ReadyQueue *queue, Policy *policy) {
     if (pcb == NULL || queue == NULL) {
         printf("Input arguments are NULL\n");
         return 1;
-    }
+    }  
     else if (pcb_get_next(pcb) != NULL) {
         printf("PCB already in ready queue\n");
         return 1;
-    }
-    else if (queue->tail == NULL || queue->head == NULL) { //empty list
+    } 
+    else if (queue->tail == NULL || queue->head == NULL) {  // empty list
         queue->head = pcb;
         queue->tail = pcb;
         return 0;
-    }
-    else if (pcb_get_background_mode(pcb)) { // append at head of queue when pcb is a batch script in background mode 
-        pcb_set_next(pcb, queue-> head);
+    } 
+    else if (pcb_get_background_mode(pcb)) {  // append at head of queue when pcb is a batch script in background mode
+        pcb_set_next(pcb, queue->head);
         queue->head = pcb;
-        pcb_toggle_background_mode(pcb); // the batch script is appended in front of the queue only once
+        pcb_toggle_background_mode(pcb);  // the batch script is appended in front of the queue only once
         return 0;
-    }
+    } 
     else {
         return policy->enqueue_function(pcb, queue, policy);
     }
 }
 
-PCB* ready_queue_dequeue(ReadyQueue *queue) {
+PCB *ready_queue_dequeue(ReadyQueue *queue) {
     if (queue == NULL) {
         printf("Ready queue doesn't exist\n");
         return NULL;
-    }
+    } 
     else if ((queue->tail == NULL) || (queue->head == NULL)) {
         printf("Can't dequeue from empty list\n");
         return NULL;
     }
     PCB *prev_head = queue->head;
     PCB *new_head = pcb_get_next(prev_head);
-    if (new_head == NULL) { // only one element was in queue
+    if (new_head == NULL) {  // only one element was in queue
         queue->tail = NULL;
     }
     queue->head = new_head;
