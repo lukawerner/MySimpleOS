@@ -15,6 +15,9 @@
 
 int MAX_ARGS_SIZE = 7;
 int multithreaded_mode = 0;
+extern pthread_t main_thread_id;
+extern int request_quit;
+
 
 int badcommand() {
     printf("Unknown Command\n");
@@ -142,12 +145,21 @@ source SCRIPT.TXT	Executes the file SCRIPT.TXT\n ";
 int quit() {
     printf("Bye!\n");
     if (multithreaded_mode) {
-        handle_quit();
+        if (pthread_equal(pthread_self(), main_thread_id)) { // only the main thread can handle quit and joining the threads
+            handle_quit();
+            exit(0);
+        }
+        else {  // if a worker called quit, we raise request_quit flag to let main know to finish when stdin is empty
+            pthread_mutex_lock(&ready_queue_lock);
+            thread_shutdown = 1; // we also signal the other thread that it can exit in case it's sleeping
+            request_quit = 1;
+            pthread_cond_broadcast(&queue_not_empty);
+            pthread_mutex_unlock(&ready_queue_lock);
+            return 0;
+        }
         return 0;
     }
-    else {
-        exit(0);
-    }
+    exit(0);
 }
 
 int set(char *var, char *value) {
@@ -172,18 +184,12 @@ int print(char *var) {
 int source(char *script) {
     const char *policy_string = "FCFS"; // source only executes one script, so any scheduling policy would act the same
     Policy *fcfs_policy = parse_policy(policy_string);
-    if (multithreaded_mode) {
-        pthread_mutex_lock(&ready_queue_lock);
-    }
     int errCode = create_pcb_and_enqueue(script, &ready_queue, fcfs_policy);
     if (errCode) {
         free(fcfs_policy);
         return badcommandFileDoesNotExist();
     }
     errCode = run_scheduler(&ready_queue, fcfs_policy);
-    if (multithreaded_mode) {
-        pthread_mutex_unlock(&ready_queue_lock);
-    }
     free(fcfs_policy);
     return errCode;
 }
@@ -216,11 +222,11 @@ int exec(int argc, char *argv[]) {
     }
     for (int i = 0; i<policy_idx; i++) {
         char *script = argv[i];
-        if (multithreaded_mode && threads_initialized) {
+        if (multithreaded_mode) {
             pthread_mutex_lock(&ready_queue_lock);
         }
         errCode = create_pcb_and_enqueue(script, &ready_queue, active_policy);
-        if (multithreaded_mode && threads_initialized) {
+        if (multithreaded_mode) {
             pthread_mutex_unlock(&ready_queue_lock);
         }
         if (errCode) {
@@ -229,11 +235,12 @@ int exec(int argc, char *argv[]) {
         }
     }
     if (background_mode) {
-        if (multithreaded_mode && threads_initialized) {
+        if (multithreaded_mode) {
             pthread_mutex_lock(&ready_queue_lock);
         }
         errCode = create_batch_script_pcb_and_enqueue();
-        if (multithreaded_mode && threads_initialized) {
+
+        if (multithreaded_mode) {
             pthread_mutex_unlock(&ready_queue_lock);
         }
         if (errCode) {

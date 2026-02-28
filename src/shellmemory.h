@@ -7,4 +7,4 @@ void prog_mem_free(int start_idx, int size);
 void prog_write_line(int idx, const char *line);
 char *mem_get_value(char *var);
 void mem_set_value(char *var, char *value);
-const char *prog_read_line(int idx);
+char *prog_read_line(int idx);

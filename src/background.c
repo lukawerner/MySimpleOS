@@ -20,7 +20,7 @@ PCB *parseBatchScript() {
 
         //printf("batch script line %i: %s\n", program_size, batch_script[program_size]);
         program_size++;
-        if (program_size >= array_size) // dynamically reallocating memory if needed
+        if (program_size >= array_size) {// dynamically reallocating memory if needed
             array_size *= 2;
             char **tmp = realloc(batch_script, sizeof(char*)*array_size);
 
@@ -30,6 +30,7 @@ PCB *parseBatchScript() {
                 return NULL;
             }
             batch_script = tmp;
+        }
     }
     int memory_start_idx = prog_mem_alloc(program_size); // allocate space for batch script
     if (memory_start_idx == -1) {

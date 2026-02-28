@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "shellmemory.h"
+#include <pthread.h>
 
 struct memory_struct {
     char *var;
@@ -9,6 +10,8 @@ struct memory_struct {
 };
 static char *program_memory[PROGRAM_MEM_SIZE];
 struct memory_struct shellmemory[MEM_SIZE];
+extern pthread_mutex_t shellmemory_lock;
+extern int multithreaded_mode;
 
 // Helper functions
 int match(char *model, char *var) {
@@ -72,15 +75,19 @@ void prog_mem_init() {
     }
 }
 
-int prog_mem_alloc(int size) { // allocates a contiguous block of size size inside program_memory
-    int start_idx = -1;        // returns the start index, or -1 if it fails
-    int block_available = 1;
+int prog_mem_alloc(int size) {              // allocates a contiguous block of size size inside program_memory
+    int start_idx = -1;                     // returns the start index, or -1 if it fails
 
-    for (int i = 0; i < PROGRAM_MEM_SIZE - size; i++) {
+    if (size <= 0 || size > PROGRAM_MEM_SIZE) {
+        return -1;
+    }
+
+    for (int i = 0; i <= PROGRAM_MEM_SIZE - size; i++) {
         if (program_memory[i] != NULL) { // while slots are taken, we iterate
             continue;                    // over the array until we find an empty slot
         }
         // empty slot found
+        int block_available = 1;
         start_idx = i;             
         for (int j = 0; j < size; j++) {
             if (program_memory[i+j] != NULL) { // if the block can't be contiguous,
@@ -100,13 +107,18 @@ void prog_write_line(int idx, const char *line) {
     program_memory[idx] = strdup(line);
 }
 
-const char *prog_read_line(int idx) {
-    return program_memory[idx];
+char *prog_read_line(int idx) {
+    pthread_mutex_lock(&shellmemory_lock);
+    char *line = strdup(program_memory[idx]);
+    pthread_mutex_unlock(&shellmemory_lock);
+    return line;
 }
 
 void prog_mem_free(int start_idx, int size) {
+    pthread_mutex_lock(&shellmemory_lock);
     for (int i = 0; i < size; i++) {
         free(program_memory[start_idx + i]);
         program_memory[start_idx + i] = NULL;
     }
+    pthread_mutex_unlock(&shellmemory_lock);
 }

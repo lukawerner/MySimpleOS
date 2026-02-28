@@ -7,6 +7,11 @@
 #include "policies.h"
 #include <string.h>
 #include <stdlib.h>
+#include <pthread.h>
+
+extern pthread_mutex_t shellmemory_lock;
+extern int multithreaded_mode;
+extern pthread_mutex_t interpreter_lock;
 
 int create_pcb_and_enqueue(char *script, ReadyQueue *queue, Policy *policy) {
     PCB* new_pcb = load_program(script);
@@ -40,7 +45,7 @@ int run_scheduler(ReadyQueue *queue, Policy *policy) {
                 return errorCode;
             }
         }
-        else {                                                          // program done, we free the pcb and program from memory
+        else {                                       // program done, we free the pcb and program from memory
             pcb_destroy(process);
         }
         dequeue_allowed = 1;
@@ -61,8 +66,18 @@ int exec_program(PCB *process, ReadyQueue *queue, Policy *policy) {
     int errorCode = 0;
     int lines_executed = 0;
     while (((pc = pcb_get_pc(process)) != prog_end_idx) && (lines_executed != policy->job_length)) {
-        const char *curr_command = prog_read_line(pc);
+        char *curr_command = prog_read_line(pc);
+
+        if (multithreaded_mode) {
+            pthread_mutex_lock(&interpreter_lock);
+        }
         errorCode = parseInput(curr_command);
+        if (multithreaded_mode) {
+            pthread_mutex_unlock(&interpreter_lock);
+        }
+        
+        free(curr_command);
+
         if (errorCode) {
             printf("Process couldn't execute properly\n");
             return errorCode;
@@ -92,10 +107,13 @@ PCB *load_program(char *script) {
         fclose(f);
         return NULL;
     }
+    pthread_mutex_lock(&shellmemory_lock);
     int start_idx = prog_mem_alloc(script_length);
     idx = start_idx;
     if (idx == -1) {
         printf("Program memory is full, can't allocate space\n");
+        pthread_mutex_unlock(&shellmemory_lock);
+        fclose(f);
         return NULL;
     }
     rewind(f);
@@ -103,6 +121,7 @@ PCB *load_program(char *script) {
         prog_write_line(idx, line);
         idx++;
     }
+    pthread_mutex_unlock(&shellmemory_lock);
     fclose(f);
     PCB *pcb = pcb_create(start_idx, script_length);
     return pcb;

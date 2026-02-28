@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS= -g
+CFLAGS= -g -pthread
 FMT=indent
 
 mysh: *.c

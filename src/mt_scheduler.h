@@ -16,7 +16,6 @@ extern pthread_mutex_t ready_queue_lock;
 extern int thread_shutdown;
 extern int threads_initialized;
 
-
 int run_multithreaded_scheduler(ReadyQueue *queue, Policy *policy);
 void *worker_scheduler(void* arg);
 void handle_quit();

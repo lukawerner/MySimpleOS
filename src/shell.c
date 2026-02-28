@@ -7,8 +7,18 @@
 #include "shellmemory.h"
 #include "scheduler.h"
 #include "readyqueue.h"
+#include "mt_scheduler.h"
+#include <pthread.h>
+
+pthread_t main_thread_id;
+extern int request_quit;
+extern int threads_initialized;
+extern pthread_mutex_t interpreter_lock;
+
 
 int parseInput(const char ui[]);
+int quit();
+extern int multithreaded_mode;
 
 // Start of everything
 int main(int argc, char *argv[]) {
@@ -33,13 +43,25 @@ int main(int argc, char *argv[]) {
     mem_init();
     prog_mem_init();
     ready_queue_init(&ready_queue);
+    main_thread_id = pthread_self();
                 
     while(1) { 
         if (interactiveMode) printf("%c ", prompt);
     
-        if (fgets(userInput, MAX_USER_INPUT-1, stdin) == NULL) {    // fgets returns NULL when it reaches the end
-            printf("Bye!\n");                                       // of the file (relevant for batch mode)
-            return 0;                                               
+        if (fgets(userInput, MAX_USER_INPUT-1, stdin) == NULL) {    // fgets returns NULL when it reaches the end of the file (relevant for batch mode)
+            int bye_already_printed = 0;
+            if (multithreaded_mode) {        // if EOF has been reached in multithreaded mode, it means main thread has processed all input commands
+                handle_quit();                                      // so now we wait for the workers to finish processing the ready queue and exit
+                pthread_mutex_lock(&ready_queue_lock);
+                if (request_quit) {
+                    bye_already_printed = 1;
+                }
+                pthread_mutex_unlock(&ready_queue_lock);
+            }
+            if (!bye_already_printed) {
+                printf("Bye!\n");
+            }                                               
+            return 0;
         }
 
         //one-liners logic starts here
@@ -53,9 +75,21 @@ int main(int argc, char *argv[]) {
             // else, we need to execute a command
             size_t command_size = end_idx-start_idx;
             char *curr_command = strndup(userInput + start_idx, command_size); // allocate and dup substring of userinput that corresponds to the separated command
+
             errorCode = parseInput(curr_command);
+
             free(curr_command);
             if (errorCode == -1) exit(99);	// ignore all other errors 
+
+            if (multithreaded_mode) {      // in multithread mode, when a quit command has been processed by a worker thread, we don't wait for EOF to exit, we just let both workers finish and exit
+                pthread_mutex_lock(&ready_queue_lock);
+                if (request_quit) {
+                    pthread_mutex_unlock(&ready_queue_lock);
+                    handle_quit();
+                    exit(0);
+                }
+                pthread_mutex_unlock(&ready_queue_lock);
+            }
             
             if (userInput[end_idx] == '\n') { // if we are done with the line (one-liners or a single command)
                 break; // we are done with the current input
@@ -80,7 +114,7 @@ int wordEnding(char c) {
 }
 
 int parseInput(const char inp[]) {
-    char tmp[200], *words[100];                            
+    char tmp[200], *words[100], *allocated_words[100];
     int ix = 0, w = 0;
     int wordlen;
     int errorCode;
@@ -92,6 +126,7 @@ int parseInput(const char inp[]) {
         }
         tmp[wordlen] = '\0';
         words[w] = strdup(tmp);
+        allocated_words[w] = words[w];
         w++;
         if (inp[ix] == '\0') break;
         ix++; 
@@ -100,5 +135,8 @@ int parseInput(const char inp[]) {
         printf("%s\r\n", words[i]);
     }*/
     errorCode = interpreter(words, w);
+    for (int i = 0; i < w; i++) {
+        free(allocated_words[i]);
+    }
     return errorCode;
 }
