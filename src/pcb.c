@@ -1,29 +1,27 @@
 #include "pcb.h"
 #include "shellmemory.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include "program.h"
 
 static pid_t pid_tracker = 1;
 
 typedef struct PCB {
     pid_t pid;
-    int memory_idx;
-    int program_size;
+    Program *program;
     int pc;
     int job_length_score;
     PCB *next;
     int backgroundModeOn;  // set to 1 if we are in background mode and pcb is a batch script, else 0
 } PCB;
 
-PCB *pcb_create(int memory_idx, int program_size) {
+PCB *pcb_create(Program *program) {
     PCB *pcb = malloc(sizeof(PCB));
     pcb->pid = pid_tracker;
     pid_tracker++;
-    pcb->memory_idx = memory_idx;
-    pcb->program_size = program_size;
-    pcb->pc = memory_idx;
-    pcb->job_length_score = program_size;
+    pcb->program = program; 
+    pcb->pc = program_get_base(program);
+    pcb->job_length_score = program_get_bounds(program);
     pcb->next = NULL;
     pcb->backgroundModeOn = 0;
     return pcb;
@@ -34,7 +32,13 @@ void pcb_toggle_background_mode(PCB *pcb) { pcb->backgroundModeOn = !(pcb->backg
 int pcb_get_background_mode(PCB *pcb) { return pcb->backgroundModeOn; }
 
 void pcb_destroy(PCB *pcb) {
-    prog_mem_free(pcb->memory_idx, pcb->program_size);
+    int pcb_count = program_get_pcb_pointing(pcb->program);
+    if (pcb_count == 1) {
+        program_destroy(pcb->program);
+    }
+    else {
+        program_dec_pcb_pointing(pcb->program);
+    }
     if (pcb != NULL) free(pcb);
 }
 
@@ -54,12 +58,12 @@ int pcb_get_pc(PCB *pcb) {
     return pcb->pc; 
 }
 
-int pcb_get_memory_idx(PCB *pcb) {
-    return pcb->memory_idx;
+Program *pcb_get_program(PCB *pcb) {
+    return pcb->program;
 }
 
 int pcb_get_program_size(PCB *pcb) {
-    return pcb->program_size;
+    return program_get_bounds(pcb->program);
 }
 
 void pcb_decrement_job_length_score(PCB *pcb) {

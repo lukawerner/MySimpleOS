@@ -1,0 +1,7 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define MAX_LINE_LENGTH 100
+#define MAX_PROGRAM 100
+#define MAX_BACKGROUND_NAME_LENGTH 32
+#endif

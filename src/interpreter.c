@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include "interpreter.h"
+#include "paging.h"
 
 int MAX_ARGS_SIZE = 7;
 int multithreaded_mode = 0;
@@ -29,19 +31,6 @@ int badcommandFileDoesNotExist() {
     return 3;
 }
 
-int help();
-int quit();
-int set(char *var, char *value);
-int print(char *var);
-int source(char *script);
-int exec(int argc, char *argv[]);
-int echo(char *token);
-int my_ls();
-int my_mkdir(char *dirname);
-int my_touch(char *filename);
-int my_cd(char *dirname);
-int run(char *args[]);
-int badcommandFileDoesNotExist();
 
 // Interpret commands and their arguments
 int interpreter(char *command_args[], int args_size) {
@@ -238,8 +227,11 @@ int exec(int argc, char *argv[]) {
         return 1;
     }
 
+
+
     for (int i = 0; i < policy_idx; i++) {
-        char *script = argv[i];
+ 
+        char *script = argv[i]; 
 
         if (multithreaded_mode) {
             pthread_mutex_lock(&ready_queue_lock);
@@ -339,6 +331,7 @@ int my_ls() {
 
     free(names);
     closedir(dir_stream);
+    return 0;
 }
 
 int my_mkdir(char *dirname) {
