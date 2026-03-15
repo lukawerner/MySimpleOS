@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 
     // init shell memory
     mem_init();
-    prog_mem_init();
+    frame_store_init();
     ready_queue_init(&ready_queue);
     main_thread_id = pthread_self();
 

@@ -2,12 +2,17 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include "config.h"
+#include "program.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include "program.h"
 
 struct memory_struct {
     char *var;
     char *value;
 };
-static char *program_memory[PROGRAM_MEM_SIZE];
+static char *frame_store[FRAME_STORE_SIZE];
 struct memory_struct shellmemory[MEM_SIZE];
 extern pthread_mutex_t shellmemory_lock;
 extern int multithreaded_mode;
@@ -57,50 +62,72 @@ char *mem_get_value(char *var_in) {
     return "Variable does not exist";
 }
 
-void prog_mem_init() {
-    for (int i = 0; i < PROGRAM_MEM_SIZE; i++) program_memory[i] = NULL;
+void frame_store_init() {
+    for (int i = 0; i < FRAME_STORE_SIZE; i++) frame_store[i] = NULL;
 }
 
-int prog_mem_alloc(int size) {  // allocates a contiguous block of size size inside program_memory
-    int start_idx = -1;         // returns the start index, or -1 if it fails
 
-    if (size <= 0 || size > PROGRAM_MEM_SIZE) return -1;
 
-    for (int i = 0; i <= PROGRAM_MEM_SIZE - size; i++) {
-        if (program_memory[i] != NULL) {  // while slots are taken, we iterate
-            continue;                     // over the array until we find an empty slot
-        }
-        // empty slot found
-        int block_available = 1;
-        start_idx = i;
-        for (int j = 0; j < size; j++) {
-            if (program_memory[i + j] != NULL) {  // if the block can't be contiguous,
-                block_available = 0;              //  we set the flag to false
-                break;
-            }
-        }
+int alloc_frame(int program_page) {
+    int start_idx = -1;          
+    start_idx = search_free_frame(0, FRAME_STORE_SIZE-1);
 
-        if (block_available) {  // if the flag kept being true after the inner loop
-            return start_idx;   // a contiguous block of size size was available
-        }
+    if (start_idx == -1) {
+    printf("Physical Memory is full");
+    exit(1);
     }
     return start_idx;
 }
 
-void prog_write_line(int idx, const char *line) { program_memory[idx] = strdup(line); }
+void store_frame(int store_idx, char *script[], int script_length, int script_idx) {
+    for (int i = 0; script_idx<script_length && i < FRAME_SIZE ; i++, script_idx++) {
+        prog_write_line(i + store_idx, script[script_idx]);
+    }
+}
+
+
+int search_free_frame(int start_idx, int end_idx) {
+    if (start_idx >= end_idx) {
+        return -1;
+    }
+    int potential_idx = (rand() % (end_idx-start_idx)) + start_idx;
+    potential_idx = (potential_idx/FRAME_SIZE)*FRAME_SIZE; 
+     
+    if (frame_store[potential_idx] != NULL) {
+        int next_potential_idx = potential_idx + FRAME_SIZE;
+        potential_idx = search_free_frame(start_idx, potential_idx); 
+        if (potential_idx != -1) return potential_idx;
+        else {
+            potential_idx = search_free_frame(next_potential_idx, end_idx);
+        }
+    }
+    return potential_idx;
+
+
+}
+
+void prog_write_line(int idx, const char *line) { frame_store[idx] = strdup(line); }
 
 char *prog_read_line(int idx) {
     pthread_mutex_lock(&shellmemory_lock);
-    char *line = strdup(program_memory[idx]);
+    char *line = strdup(frame_store[idx]);
     pthread_mutex_unlock(&shellmemory_lock);
     return line;
 }
 
-void prog_mem_free(int start_idx, int size) {
-    pthread_mutex_lock(&shellmemory_lock);
-    for (int i = 0; i < size; i++) {
-        free(program_memory[start_idx + i]);
-        program_memory[start_idx + i] = NULL;
+void mem_free_frame(int frame_idx) {
+    for (int i = 0; i < FRAME_SIZE; i++) {
+        free(frame_store[frame_idx + i]);
+        frame_store[frame_idx + i] = NULL;
     }
+    }
+
+void prog_mem_free(Program *p) {
+    pthread_mutex_lock(&shellmemory_lock);
+    int num_of_pages = program_get_num_of_pages(p);
+    for (int i = 0; i<num_of_pages; i++) {
+        int frame = program_get_frame(p, i);
+        mem_free_frame(frame);
+    } 
     pthread_mutex_unlock(&shellmemory_lock);
-}
+} 

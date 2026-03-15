@@ -1,10 +1,15 @@
-#define MEM_SIZE 1000
-#define PROGRAM_MEM_SIZE 1000
+#ifndef SHELLMEMORY_H
+#define SHELLMEMORY_H
+typedef struct Program Program;
 void mem_init();
-void prog_mem_init();
-int prog_mem_alloc(int size);
-void prog_mem_free(int start_idx, int size);
+void frame_store_init();
+void store_frame(int store_idx, char *script[], int script_length, int script_idx);
+int alloc_frame(int program_page);
+void mem_free_frame(int frame_idx);
+void prog_mem_free(Program *p);
+int search_free_frame(int start_idx, int end_idx);
 void prog_write_line(int idx, const char *line);
 char *mem_get_value(char *var);
 void mem_set_value(char *var, char *value);
 char *prog_read_line(int idx);
+#endif

@@ -45,26 +45,17 @@ PCB *parseBatchScript() {
 }
 
 Program *create_background_program(char **background_script, int script_size) {
-
-    // allocate space for batch script
-    int memory_start_idx = prog_mem_alloc(script_size);
-    if (memory_start_idx == -1) {
-        free_array(background_script, script_size);
-        printf("Couldn't allocate memory for batch script\n");
-        return NULL;
-    }
-
-    // write batch script to program memory
-    for (int i = 0; i < script_size; i++) {
-        prog_write_line(memory_start_idx + i, background_script[i]);
-    }
-    // create program for it
     char script_name[MAX_BACKGROUND_NAME_LENGTH];
     snprintf(script_name, sizeof(script_name), "BATCH%d", next_batch_pid);
     next_batch_pid++;
-    return program_create(script_name, memory_start_idx, script_size);
+    Program* background_program = program_create(script_name);
 
+    background_program_set_length(background_program, script_size);
+    int n_frames = convert_length_to_pages(script_size);
+    program_load_frames(background_program, background_script, n_frames);
+    return background_program;
 }
+
 int create_batch_script_pcb_and_enqueue() {
     PCB *batch_script_pcb = parseBatchScript();
 

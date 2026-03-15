@@ -18,4 +18,8 @@ int pcb_get_program_size(PCB *pcb);
 void pcb_decrement_job_length_score(PCB *pcb);
 int pcb_get_job_length_score(PCB *pcb);
 
+int pcb_get_frame_number(PCB* pcb);
+int pcb_get_page_offset(PCB *pcb);
+int pcb_get_physical_address(PCB *pcb);
+
 #endif

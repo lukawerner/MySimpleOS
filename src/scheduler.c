@@ -18,7 +18,7 @@ extern pthread_mutex_t interpreter_lock;
 int create_pcb_and_enqueue(char *script, ReadyQueue *queue, Policy *policy) {
     Program *prog;  
     if (!program_already_exists(script)) {
-        prog = program_create(script, 0, 0); // base and bounds are set to 0 but are updated by load_program() on the next line
+        prog = program_create(script);
         if (load_program(prog)) return 1;
     }
     else {
@@ -66,20 +66,20 @@ int run_scheduler(ReadyQueue *queue, Policy *policy) {
 }
 
 int process_completed(PCB *process) {
-    Program *executable = pcb_get_program(process);
-    int prog_end_idx = program_get_base(executable) + program_get_bounds(executable);
-    return pcb_get_pc(process) == prog_end_idx;
+    int prog_length = pcb_get_program_size(process); 
+    return pcb_get_pc(process) == prog_length;
 }
 
-int exec_program(PCB *process, ReadyQueue *queue, Policy *policy) {
-    Program *executable = pcb_get_program(process);
-    int prog_end_idx = program_get_base(executable) + program_get_bounds(executable);
+int exec_program(PCB *process, ReadyQueue *queue, Policy *policy) { 
+    int prog_length = pcb_get_program_size(process);
     int pc;
     int errorCode = 0;
     int lines_executed = 0;
 
-    while (((pc = pcb_get_pc(process)) != prog_end_idx) && (lines_executed != policy->job_length)) {
-        char *curr_command = prog_read_line(pc);
+    while (((pc = pcb_get_pc(process)) != prog_length) && (lines_executed != policy->job_length)) {
+        int address = pcb_get_physical_address(process);
+        
+        char *curr_command = prog_read_line(address);
 
         if (multithreaded_mode) {
             pthread_mutex_lock(&interpreter_lock);
