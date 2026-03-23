@@ -98,7 +98,6 @@ int exec_program(PCB *process, ReadyQueue *queue, Policy *policy) {
             pthread_mutex_lock(&interpreter_lock);
         }        
         errorCode = parseLine(curr_command);
-        update_mru(frame_number);
 
         if (multithreaded_mode) {
             pthread_mutex_unlock(&interpreter_lock);
