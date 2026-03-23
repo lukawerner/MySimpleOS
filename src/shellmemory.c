@@ -68,20 +68,21 @@ void frame_store_init() {
 
 
 
-int alloc_frame(int program_page) {
+int alloc_frame() {
     int start_idx = -1;          
     start_idx = search_free_frame(0, FRAME_STORE_SIZE-1);
 
     if (start_idx == -1) {
-    printf("Physical Memory is full");
-    exit(1);
+        return start_idx;
     }
-    return start_idx;
+    return start_idx/FRAME_SIZE;
 }
 
-void store_frame(int store_idx, char *script[], int script_length, int script_idx) {
-    for (int i = 0; script_idx<script_length && i < FRAME_SIZE ; i++, script_idx++) {
-        prog_write_line(i + store_idx, script[script_idx]);
+void store_frame(int frame_number, char *script[], int script_length, int page_number) {
+    //printf("store_frame_arguments: frame_number %d, script_length %d, page_number %d\n", frame_number, script_length, page_number);
+    for (int i = 0, VA = page_number*FRAME_SIZE; VA<script_length && i < FRAME_SIZE ; i++, VA++) {
+        int PA = frame_number * FRAME_SIZE + i;
+        prog_write_line(PA, script[VA]);
     }
 }
 
@@ -110,9 +111,13 @@ void prog_write_line(int idx, const char *line) { frame_store[idx] = strdup(line
 
 char *prog_read_line(int idx) {
     pthread_mutex_lock(&shellmemory_lock);
-    char *line = strdup(frame_store[idx]);
+    char *line = prog_read_line_unlocked(idx);
     pthread_mutex_unlock(&shellmemory_lock);
     return line;
+}
+
+char *prog_read_line_unlocked(int idx) {
+    return strdup(frame_store[idx]);
 }
 
 void mem_free_frame(int frame_idx) {
@@ -124,10 +129,10 @@ void mem_free_frame(int frame_idx) {
 
 void prog_mem_free(Program *p) {
     pthread_mutex_lock(&shellmemory_lock);
-    int num_of_pages = program_get_num_of_pages(p);
+    int num_of_pages = program_get_num_of_frames(p);
     for (int i = 0; i<num_of_pages; i++) {
         int frame = program_get_frame(p, i);
-        mem_free_frame(frame);
+        mem_free_frame(frame*FRAME_SIZE);
     } 
     pthread_mutex_unlock(&shellmemory_lock);
 } 

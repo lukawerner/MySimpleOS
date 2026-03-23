@@ -1,4 +1,5 @@
 #include "shell.h"
+#include "config.h"
 #include "interpreter.h"
 #include "mt_scheduler.h"
 #include "readyqueue.h"
@@ -9,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "lru.h"
 
 pthread_t main_thread_id;
 extern int request_quit;
@@ -19,7 +21,7 @@ extern int multithreaded_mode;
 
 // Start of everything
 int main(int argc, char *argv[]) {
-    printf("Shell version 1.5 created Dec 2025\n");
+    printf("Frame Store Size = %d; Variable Store Size = %d\n", FRAME_STORE_SIZE, MEM_SIZE);
     fflush(stdout);
 
     char prompt = '$';               // Shell prompt
@@ -35,10 +37,11 @@ int main(int argc, char *argv[]) {
     // (batch vs interactive mode)
     int interactiveMode = isatty(STDIN_FILENO);
 
-    // init shell memory
     mem_init();
     frame_store_init();
     ready_queue_init(&ready_queue);
+    if (lru_map_init()) return 1;
+
     main_thread_id = pthread_self();
 
     while (1) {
@@ -67,55 +70,59 @@ int main(int argc, char *argv[]) {
             return 0;
         }
 
-        // one-liners logic starts here
-        int end_idx = 0;
-        int start_idx = 0;
+        errorCode = parseLine(userInput);
 
-        while (userInput[end_idx] != '\0') {
-            // as long as we haven't reached the end of the input
-            if (userInput[end_idx] != ';' && userInput[end_idx] != '\n') {  // if we haven't encountered a command separator
-                end_idx++;
-                continue;  // we just increment the user input index;
-            }
-
-            // else, we need to execute a command
-            size_t command_size = end_idx - start_idx;
-            char *curr_command = strndup(userInput + start_idx, command_size);
-
-            errorCode = parseInput(curr_command);
-            free(curr_command);
-
-            if (errorCode == -1) {
-                exit(99);
-            }
-
-            if (multithreaded_mode) {
-                // in multithread mode, when a quit command has been processed by a worker thread,
-                // we don't wait for EOF to exit, we just let both workers finish and exit
-                pthread_mutex_lock(&ready_queue_lock);
-                if (request_quit) {
-                    pthread_mutex_unlock(&ready_queue_lock);
-                    handle_quit();
-                    exit(0);
-                }
+        if (multithreaded_mode) {
+            // in multithread mode, when a quit command has been processed by a worker thread,
+            // we don't wait for EOF to exit, we just let both workers finish and exit
+            pthread_mutex_lock(&ready_queue_lock);
+            if (request_quit) {
                 pthread_mutex_unlock(&ready_queue_lock);
+                handle_quit();
+                exit(0);
             }
-
-            // if we are done with the line (one-liners or a single command)
-            if (userInput[end_idx] == '\n') {
-                break;
-            } else {
-                // if we only encountered a ';' separator, we need to keep iterating
-                end_idx++;
-                start_idx = end_idx;
-            }
+            pthread_mutex_unlock(&ready_queue_lock);
         }
-
         // one liner logic stops here;
         memset(userInput, 0, sizeof(userInput));
     }
 
     return 0;
+}
+
+int parseLine(const char userInput[]) {
+    // one-liners logic starts here
+    int end_idx = 0;
+    int start_idx = 0;
+    int errorCode = 0;
+
+    while (1) {
+        // as long as we haven't reached the end of the input
+        if (userInput[end_idx] != ';' && userInput[end_idx] != '\n' && userInput[end_idx] != '\0') {  // if we haven't encountered a command separator
+            end_idx++;
+            continue;  // we just increment the user input index;
+        }
+
+        // else, we need to execute a command
+        size_t command_size = end_idx - start_idx;
+        char *curr_command = strndup(userInput + start_idx, command_size);
+
+        errorCode = parseInput(curr_command);
+        free(curr_command);
+
+        if (errorCode == -1) {
+            exit(99);
+        }
+            // if we are done with the line (one-liners or a single command)
+        if (userInput[end_idx] == '\n' || userInput[end_idx] == '\0') {
+            break;
+        } else {
+            // if we only encountered a ';' separator, we need to keep iterating
+            end_idx++;
+            start_idx = end_idx;
+        }     
+    }
+    return errorCode;
 }
 
 int wordEnding(char c) {

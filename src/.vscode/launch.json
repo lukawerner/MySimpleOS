@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug mysh with input",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/mysh",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/A3-test-cases",
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "externalConsole": true
+    }
+  ]
+}

@@ -8,8 +8,10 @@
 #include <string.h>
 #include "config.h"
 #include "program.h"
+#include <pthread.h>
 
 static int next_batch_pid = 0;
+extern pthread_mutex_t shellmemory_lock;
 
 PCB *parseBatchScript() {
     int program_size = 0;
@@ -52,8 +54,23 @@ Program *create_background_program(char **background_script, int script_size) {
 
     background_program_set_length(background_program, script_size);
     int n_frames = convert_length_to_pages(script_size);
-    program_load_frames(background_program, background_script, n_frames);
+    background_program_set_frames_idx(background_program, n_frames);
+    load_background_program_pages(background_program, background_script, n_frames);
     return background_program;
+}
+
+int load_background_program_pages(Program *bp, char** background_script, int n_pages) {
+    pthread_mutex_lock(&shellmemory_lock);
+    for (int i=0; i<n_pages; i++) {
+        int page_number = i;
+        int errorCode = load_page_into_frame_store(bp, background_script, page_number);
+        if (errorCode) {
+            pthread_mutex_unlock(&shellmemory_lock);
+            return 1;
+        } 
+    } 
+    pthread_mutex_unlock(&shellmemory_lock);
+    return 0;
 }
 
 int create_batch_script_pcb_and_enqueue() {

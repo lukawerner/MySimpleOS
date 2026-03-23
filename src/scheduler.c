@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "program.h"
+#include "paging.h"
+#include "lru.h"
 
 extern pthread_mutex_t shellmemory_lock;
 extern int multithreaded_mode;
@@ -19,7 +21,7 @@ int create_pcb_and_enqueue(char *script, ReadyQueue *queue, Policy *policy) {
     Program *prog;  
     if (!program_already_exists(script)) {
         prog = program_create(script);
-        if (load_program(prog)) return 1;
+        if (init_load_program(prog)) return 1;
     }
     else {
         prog = find_program_in_table(script);
@@ -51,7 +53,7 @@ int run_scheduler(ReadyQueue *queue, Policy *policy) {
 
             errorCode = ready_queue_enqueue(process, queue, policy);
             if (errorCode) {
-                printf("Couldn't enqueue uncompleted process\n");
+                printf("Couldn't enqueue uncompleted process\n"); 
                 return errorCode;
             }
         } 
@@ -77,15 +79,26 @@ int exec_program(PCB *process, ReadyQueue *queue, Policy *policy) {
     int lines_executed = 0;
 
     while (((pc = pcb_get_pc(process)) != prog_length) && (lines_executed != policy->job_length)) {
+        pthread_mutex_lock(&shellmemory_lock);
         int address = pcb_get_physical_address(process);
+        if (address == -1) {
+            pthread_mutex_unlock(&shellmemory_lock);
+            int errorCode = handle_page_fault(process);
+            if (errorCode) exit(1);
+            return errorCode;
+        }
+        //printf("address: %d\n", address); 
+        char *curr_command = prog_read_line_unlocked(address);
+        int frame_number = pcb_get_frame_number(process);
+        update_mru(frame_number);
         
-        char *curr_command = prog_read_line(address);
+        pthread_mutex_unlock(&shellmemory_lock);
 
         if (multithreaded_mode) {
             pthread_mutex_lock(&interpreter_lock);
-        }
-
-        errorCode = parseInput(curr_command);
+        }        
+        errorCode = parseLine(curr_command);
+        update_mru(frame_number);
 
         if (multithreaded_mode) {
             pthread_mutex_unlock(&interpreter_lock);
@@ -95,6 +108,7 @@ int exec_program(PCB *process, ReadyQueue *queue, Policy *policy) {
 
         if (errorCode) {
             printf("Process couldn't execute properly\n");
+            exit(1);
             return errorCode;
         }
         pcb_increment_pc(process);

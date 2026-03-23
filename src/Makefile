@@ -1,6 +1,8 @@
 CC=gcc
-CFLAGS= -g -pthread
+CFLAGS= -D FRAME_STORE_SIZE=$(framesize) -D MEM_SIZE=$(varmemsize) -g -pthread
 FMT=indent
+framesize ?= 900
+varmemsize ?= 1000
 
 mysh: *.c
 	$(CC) $(CFLAGS) -c *.c

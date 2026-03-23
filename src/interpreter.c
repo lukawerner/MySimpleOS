@@ -13,7 +13,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "interpreter.h"
-#include "paging.h"
 
 int MAX_ARGS_SIZE = 7;
 int multithreaded_mode = 0;
@@ -44,6 +43,9 @@ int interpreter(char *command_args[], int args_size) {
     for (i = 0; i < args_size; i++) {
         command_args[i][strcspn(command_args[i], "\r\n")] = 0;
     }
+    /*for (int i = 0; i < args_size; i++) {
+        printf("arg %d is %s\n", i, command_args[i]);
+    }*/
 
     if (strcmp(command_args[0], "help") == 0) {
         //help
