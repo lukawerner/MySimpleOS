@@ -70,15 +70,7 @@ int pcb_get_background_mode(PCB *pcb) { return pcb->backgroundModeOn; }
 void pcb_destroy(PCB *pcb) {
     int pcb_count = program_get_pcb_pointing(pcb->program);
     program_dec_pcb_pointing(pcb->program);
-    /*
-    if (pcb_count == 1) {
-        if (program_destroy(pcb->program)) {
-            printf("Error: Another process using freed executable: %s\n", program_get_name(pcb->program));
-            exit(1);
-        }
-        
-    }
-    */
+
     if (pcb != NULL) free(pcb);
 }
 

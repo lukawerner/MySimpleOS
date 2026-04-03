@@ -36,7 +36,6 @@ Program *program_create(char *name) {
     return p; 
 }
 int load_page_into_frame_store(Program * p, char** lines, int page_number) {
-    //printf("load_pages_into_frames_arguments: program %s, n_frames %d, next_page %d\n", p->name, n_frames, next_page);
     if (p->frames_idx == NULL) {
         printf("Frame pointers intializer failed for %s\n", p->name);
         exit(1);
@@ -49,7 +48,6 @@ int load_page_into_frame_store(Program * p, char** lines, int page_number) {
     if (frame_num == -1) {
         return 1;
     }
-    //printf("Frame number allocated: %d\n", frame_num);
     store_frame(frame_num, lines, p->length, page_number); 
     p->frames_idx[page_number] = frame_num;
     update_mru(frame_num);
